@@ -1,0 +1,141 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Lighthouse Template: Low-cost PostgreSQL on EC2 with persistent EBS and S3 Init.'
+
+Parameters:
+  KeyName:
+    Description: Name of an existing EC2 KeyPair to enable SSH access
+    Type: AWS::EC2::KeyPair::KeyName
+    # mran_admin
+  VpcId:
+    Description: The ID of your VPC
+    Type: AWS::EC2::VPC::Id
+    # vpc-09eb94d8ff683b510
+  SubnetId:
+    Description: The ID of the Subnet (must be in the same AZ as the Volume)
+    Type: AWS::EC2::Subnet::Id
+    # subnet-0d61b4a9ef5e9a8fb
+  SQLScriptS3Path:
+    Description: S3 URI for your SQL script (e.g., s3://my-bucket/build.sql)
+    # s3://database-builder-script/create_statements.sql
+    Type: String
+  DBAdminUser:
+    Type: String
+    Default: dbadmin
+  DBAdminPassword:
+    Type: String
+    NoEcho: true
+  AppUser:
+    Type: String
+    Default: dev_user
+  AppPassword:
+    Type: String
+    NoEcho: true
+
+Resources:
+  # 1. Firewall: Allow SSH and Postgres
+  PostgresSecurityGroup:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+      GroupDescription: Allow SSH and PostgreSQL
+      VpcId: !Ref VpcId
+      SecurityGroupIngress:
+        - IpProtocol: tcp
+          FromPort: 22
+          ToPort: 22
+          CidrIp: 0.0.0.0/0 
+        - IpProtocol: tcp
+          FromPort: 5432
+          ToPort: 5432
+          CidrIp: 0.0.0.0/0
+
+  # 2. Permissions: Let EC2 talk to S3
+  EC2S3ReadOnlyRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          - Effect: Allow
+            Principal: { Service: [ ec2.amazonaws.com ] }
+            Action: [ 'sts:AssumeRole' ]
+      ManagedPolicyArns:
+        - arn:aws:iam::aws:policy/AmazonS3ReadOnlyAccess
+
+  EC2InstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Roles: [ !Ref EC2S3ReadOnlyRole ]
+
+  # 3. Persistent Storage
+  PostgresDataVolume:
+    Type: AWS::EC2::Volume
+    Properties:
+      Size: 10
+      AvailabilityZone: !GetAtt MyEC2Instance.AvailabilityZone
+      VolumeType: gp3
+
+  MountPoint:
+    Type: AWS::EC2::VolumeAttachment
+    Properties:
+      InstanceId: !Ref MyEC2Instance
+      VolumeId: !Ref PostgresDataVolume
+      Device: /dev/sdh
+
+  # 4. The Server
+  MyEC2Instance:
+    Type: AWS::EC2::Instance
+    Properties:
+      InstanceType: t3.micro
+      ImageId: ami-00a8151272c45cd8e # Amazon Linux 2023 - verify for your region
+      KeyName: !Ref KeyName
+      IamInstanceProfile: !Ref EC2InstanceProfile
+      NetworkInterfaces:
+        - AssociatePublicIpAddress: true
+          DeviceIndex: 0
+          SubnetId: !Ref SubnetId
+          GroupSet: [ !Ref PostgresSecurityGroup ]
+      UserData:
+        Fn::Base64: !Sub |
+          #!/bin/bash
+          # Install Postgres 15
+          dnf update -y
+          dnf install -y postgresql15-server
+          
+          # Handle EBS Volume
+          while [ ! -b /dev/sdh ]; do sleep 2; done
+          blkid /dev/sdh || mkfs -t xfs /dev/sdh
+          mkdir -p /var/lib/pgsql/data
+          mount /dev/sdh /var/lib/pgsql/data
+          echo "/dev/sdh /var/lib/pgsql/data xfs defaults,nofail 0 2" >> /etc/fstab
+          chown postgres:postgres /var/lib/pgsql/data
+
+          # Init DB
+          postgresql-setup --initdb
+          
+          # Allow remote connections
+          echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf
+          echo "listen_addresses='*'" >> /var/lib/pgsql/data/postgresql.conf
+          
+          systemctl enable postgresql
+          systemctl start postgresql
+
+          # Set up Users
+          sudo -u postgres psql -c "ALTER USER postgres WITH PASSWORD '${DBAdminPassword}';"
+          sudo -u postgres psql -c "CREATE USER ${AppUser} WITH PASSWORD '${AppPassword}';"
+          sudo -u postgres psql -c "ALTER USER ${AppUser} CREATEDB;"
+
+          # Pull and run the SQL script from S3
+          aws s3 cp ${SQLScriptS3Path} /tmp/init.sql
+          sudo -u postgres psql -f /tmp/init.sql
+
+Outputs:
+  InstancePublicIP:
+    Description: "The Public IP address of the PostgreSQL server"
+    Value: !GetAtt MyEC2Instance.PublicIp
+
+  PostgresLoginCommand:
+    Description: "Command to log into the database"
+    Value: !Sub 
+      - "psql -h ${IP} -U ${User} -d postgres"
+      - IP: !GetAtt MyEC2Instance.PublicIp
+        User: !Ref AppUser

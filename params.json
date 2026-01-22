@@ -1,0 +1,30 @@
+[
+    {
+        "ParameterKey": "KeyName",
+        "ParameterValue": "postgresql_ec2_data_practice"
+    },
+    {
+        "ParameterKey": "VpcId",
+        "ParameterValue": "vpc-09eb94d8ff683b510"
+    },
+    {
+        "ParameterKey": "SubnetId",
+        "ParameterValue": "subnet-0d61b4a9ef5e9a8fb"
+    },
+    {
+        "ParameterKey": "SQLScriptS3Path",
+        "ParameterValue": "s3://database-builder-script/create_statements.sql"
+    },
+    {
+        "ParameterKey": "DBAdminPassword",
+        "ParameterValue": "C@nn1b@l_x"
+    },
+    {
+        "ParameterKey": "AppUser",
+        "ParameterValue": "web_app_dev"
+    },
+    {
+        "ParameterKey": "AppPassword",
+        "ParameterValue": "C@nn1b@l_x"
+    }
+]
