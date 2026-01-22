@@ -81,6 +81,18 @@ Resources:
       VolumeId: !Ref PostgresDataVolume
       Device: /dev/sdh
 
+  # 3b. Elastic IP
+  PostgresElasticIP:
+    Type: AWS::EC2::ElasticIp
+    Properties:
+      Domain: vpc
+
+  ElasticIPAssociation:
+    Type: AWS::EC2::EIPAssociation
+    Properties:
+      InstanceId: !Ref MyEC2Instance
+      AllocationId: !GetAtt PostgresElasticIP.AllocationId
+
   # 4. The Server
   MyEC2Instance:
     Type: AWS::EC2::Instance
@@ -137,9 +149,13 @@ Outputs:
     Description: "The Public IP address of the PostgreSQL server"
     Value: !GetAtt MyEC2Instance.PublicIp
 
+  ElasticIP:
+    Description: "The Elastic IP address of the PostgreSQL server"
+    Value: !Ref PostgresElasticIP
+
   PostgresLoginCommand:
     Description: "Command to log into the database"
     Value: !Sub 
       - "psql -h ${IP} -U ${User} -d postgres"
-      - IP: !GetAtt MyEC2Instance.PublicIp
+      - IP: !Ref PostgresElasticIP
         User: !Ref AppUser

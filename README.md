@@ -6,6 +6,7 @@ This repository contains infrastructure-as-code (IaC) to quickly deploy a Postgr
 
 This solution provides:
 - **EC2 Instance** (t3.micro) running PostgreSQL 15 on Amazon Linux 2023
+- **Elastic IP** for a persistent, static IP address
 - **Persistent EBS Volume** (10 GB gp3) for database data
 - **IAM Permissions** for EC2 to read SQL initialization scripts from S3
 - **Security Group** for SSH and PostgreSQL access
@@ -17,8 +18,10 @@ This solution provides:
 The CloudFormation template that defines all AWS resources:
 - **Security Group**: Allows SSH (port 22) and PostgreSQL (port 5432)
 - **IAM Role & Instance Profile**: Grants EC2 permission to read from S3
+- **Elastic IP**: Static IP address that persists across instance restarts
 - **EBS Volume**: Persistent 10 GB storage mounted at `/var/lib/pgsql/data`
 - **EC2 Instance**: Runs PostgreSQL with automatic initialization
+- **Remote Connection**: Configures `pg_hba.conf` with md5 authentication for remote connections (rule inserted before default ident rules to ensure proper priority)
 
 ### `params.json`
 Configuration parameters for the CloudFormation stack:
@@ -105,6 +108,9 @@ Modify `InstanceType` in the template to change instance size (default: `t3.micr
 ### EBS Volume Size
 Adjust the `Size` property of `PostgresDataVolume` (default: 10 GB).
 
+### Elastic IP
+The Elastic IP is automatically created and associated with the instance. To use a different address or disassociate it, modify the template or manage it through the AWS console.
+
 ### PostgreSQL Port
 The default port is 5432. To change it, modify the security group ingress rule.
 
@@ -132,8 +138,9 @@ Or use the optional cleanup prompt in the deployment script.
 ## Outputs
 
 After deployment, CloudFormation provides:
-- **InstancePublicIP**: The public IP address of your PostgreSQL server
-- **PostgresLoginCommand**: Ready-to-use connection command
+- **InstancePublicIP**: The public IP address assigned by AWS (temporary)
+- **ElasticIP**: The static Elastic IP address (persistent)
+- **PostgresLoginCommand**: Ready-to-use connection command using the Elastic IP
 
 ## Troubleshooting
 
