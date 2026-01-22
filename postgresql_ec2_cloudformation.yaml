@@ -124,6 +124,10 @@ Resources:
           sudo -u postgres psql -c "CREATE USER ${AppUser} WITH PASSWORD '${AppPassword}';"
           sudo -u postgres psql -c "ALTER USER ${AppUser} CREATEDB;"
 
+          sudo -u postgres psql -c "GRANT USAGE ON SCHEMA public TO ${AppUser};"
+          sudo -u postgres psql -c "GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO ${AppUser};"
+          sudo -u postgres psql -c "ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO ${AppUser};"
+
           # Pull and run the SQL script from S3
           aws s3 cp ${SQLScriptS3Path} /tmp/init.sql
           sudo -u postgres psql -f /tmp/init.sql
