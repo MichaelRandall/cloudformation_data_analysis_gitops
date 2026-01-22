@@ -112,8 +112,8 @@ Resources:
           # Init DB
           postgresql-setup --initdb
           
-          # Allow remote connections
-          echo "host all all 0.0.0.0/0 md5" >> /var/lib/pgsql/data/pg_hba.conf
+          # Allow remote connections (insert BEFORE default ident rules)
+          sed -i '1i host all all 0.0.0.0/0 md5' /var/lib/pgsql/data/pg_hba.conf
           echo "listen_addresses='*'" >> /var/lib/pgsql/data/postgresql.conf
           
           systemctl enable postgresql
