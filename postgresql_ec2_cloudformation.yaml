@@ -14,6 +14,9 @@ Parameters:
     Description: The ID of the Subnet (must be in the same AZ as the Volume)
     Type: AWS::EC2::Subnet::Id
     # subnet-0d61b4a9ef5e9a8fb
+  AvailabilityZone:
+    Description: The Availability Zone for the EBS volume (must match subnet)
+    Type: AWS::EC2::AvailabilityZone::Name
   SQLScriptS3Path:
     Description: S3 URI for your SQL script (e.g., s3://my-bucket/build.sql)
     # s3://database-builder-script/create_statements.sql
@@ -71,7 +74,7 @@ Resources:
     Type: AWS::EC2::Volume
     Properties:
       Size: 10
-      AvailabilityZone: !GetAtt MyEC2Instance.AvailabilityZone
+      AvailabilityZone: !Ref AvailabilityZone
       VolumeType: gp3
 
   MountPoint:
@@ -83,12 +86,13 @@ Resources:
 
   # 3b. Elastic IP
   PostgresElasticIP:
-    Type: AWS::EC2::ElasticIp
+    Type: AWS::EC2::EIP
     Properties:
       Domain: vpc
 
   ElasticIPAssociation:
     Type: AWS::EC2::EIPAssociation
+    DependsOn: MyEC2Instance
     Properties:
       InstanceId: !Ref MyEC2Instance
       AllocationId: !GetAtt PostgresElasticIP.AllocationId

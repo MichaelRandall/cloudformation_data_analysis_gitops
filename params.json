@@ -26,5 +26,9 @@
     {
         "ParameterKey": "AppPassword",
         "ParameterValue": "C@nn1b@l_x"
+    },
+    {
+        "ParameterKey": "AvailabilityZone",
+        "ParameterValue": "us-west-2c"
     }
 ]
